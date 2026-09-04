@@ -422,36 +422,112 @@ class AmoledLoggingScreen extends StatefulWidget {
   _AmoledLoggingScreenState createState() => _AmoledLoggingScreenState();
 }
 
+enum InputFocus { weight, reps, none }
+
 class _AmoledLoggingScreenState extends State<AmoledLoggingScreen> {
   bool set1Completed = false;
+  String currentWeight = "140";
+  String currentReps = "5";
+  InputFocus activeFocus = InputFocus.none;
+  
+  // Rest Timer State
+  bool isResting = false;
+  int restTimeRemaining = 90; // 1m 30s
+  
+  void _startRestTimer() {
+    setState(() {
+      isResting = true;
+      restTimeRemaining = 90;
+    });
+    _tickRestTimer();
+  }
 
-  void _openDataEntrySheet() {
+  void _tickRestTimer() {
+    if (!isResting) return;
+    Future.delayed(const Duration(seconds: 1), () {
+      if (!mounted || !isResting) return;
+      setState(() {
+        if (restTimeRemaining > 0) {
+          restTimeRemaining--;
+          _tickRestTimer();
+        } else {
+          isResting = false;
+          HapticFeedback.heavyImpact(); // Timer done
+        }
+      });
+    });
+  }
+
+  void _handleKeyPress(String val) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (val.startsWith("+")) {
+        // Handle Micro-plates mathematically
+        if (activeFocus == InputFocus.weight) {
+          double cw = double.tryParse(currentWeight) ?? 0;
+          double add = double.tryParse(val.replaceAll("+", "")) ?? 0;
+          currentWeight = (cw + add).toString().replaceAll(RegExp(r'\.0\$'), '');
+        }
+      } else {
+        // Handle standard numeric input
+        if (activeFocus == InputFocus.weight) {
+          if (currentWeight == "0" || currentWeight == "140") currentWeight = "";
+          currentWeight += val;
+        } else if (activeFocus == InputFocus.reps) {
+          if (currentReps == "0" || currentReps == "5") currentReps = "";
+          currentReps += val;
+        }
+      }
+    });
+  }
+
+  void _openDataEntrySheet(InputFocus initialFocus) {
     HapticFeedback.mediumImpact();
+    setState(() {
+      activeFocus = initialFocus;
+      set1Completed = false; // Uncheck if editing
+      isResting = false; // Stop timer if editing
+    });
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.black,
-      barrierColor: Colors.black.withValues(alpha: 0.8), // Darken background deeply
+      barrierColor: Colors.transparent, // Allow seeing the row highlight
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
-      builder: (context) => FrictionlessKeypad(
-        onKeyPressed: (val) {
-          HapticFeedback.selectionClick();
-        },
-        onLogSet: () {
-          HapticFeedback.heavyImpact();
-          setState(() {
-            set1Completed = true;
-          });
-          Navigator.pop(context);
-        },
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => FrictionlessKeypad(
+          onKeyPressed: (val) {
+            _handleKeyPress(val);
+          },
+          onLogSet: () {
+            HapticFeedback.heavyImpact();
+            if (activeFocus == InputFocus.weight) {
+              // Move to reps
+              setState(() => activeFocus = InputFocus.reps);
+            } else {
+              // Complete set
+              setState(() {
+                activeFocus = InputFocus.none;
+                set1Completed = true;
+              });
+              Navigator.pop(context); // Close sheet
+              _startRestTimer(); // Trigger Rest Timer feature
+            }
+          },
+        )
       ),
-    );
+    ).whenComplete(() {
+      if (mounted) setState(() => activeFocus = InputFocus.none);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    String formattedTime = "\${(restTimeRemaining ~/ 60)}:\${(restTimeRemaining % 60).toString().padLeft(2, '0')}";
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -473,120 +549,203 @@ class _AmoledLoggingScreenState extends State<AmoledLoggingScreen> {
         centerTitle: true,
       ),
       body: SafeArea(
-        child: ListView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Column(
           children: [
-            // Exercise Header
-            Text(
-              "Conventional Deadlift",
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              "Brace hard, drive through floor",
-              style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
-            ),
-            const SizedBox(height: 32),
-            
-            // Labels Row
-            Row(
-              children: const [
-                SizedBox(width: 32, child: Text("SET", style: TextStyle(color: AppTheme.textTertiary, fontSize: 12, fontWeight: FontWeight.bold))),
-                Expanded(child: Text("PREVIOUS", style: TextStyle(color: AppTheme.textTertiary, fontSize: 12, fontWeight: FontWeight.bold))),
-                SizedBox(width: 70, child: Text("KG", textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textTertiary, fontSize: 12, fontWeight: FontWeight.bold))),
-                SizedBox(width: 60, child: Text("REPS", textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textTertiary, fontSize: 12, fontWeight: FontWeight.bold))),
-                SizedBox(width: 48, child: Icon(Icons.check, size: 16, color: AppTheme.textTertiary)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            
-            // Set Row
-            BouncyButton(
-              onTap: _openDataEntrySheet,
-              backgroundColor: set1Completed ? AppTheme.success.withValues(alpha: 0.1) : AppTheme.surfaceElevation1,
-              border: Border.all(
-                color: set1Completed ? AppTheme.success.withValues(alpha: 0.3) : Colors.transparent,
-                width: 1,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-              child: Row(
+            Expanded(
+              child: ListView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 children: [
-                  const SizedBox(
-                    width: 24, 
-                    child: Center(
-                      child: Text("1", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                  // Exercise Header
+                  Text(
+                    "Conventional Deadlift",
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      "140 kg × 5", 
-                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 15),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: 8),
+                  const Text(
+                    "Brace hard, drive through floor",
+                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
+                  ),
+                  const SizedBox(height: 32),
+                  
+                  // Labels Row
+                  Row(
+                    children: const [
+                      SizedBox(width: 32, child: Text("SET", style: TextStyle(color: AppTheme.textTertiary, fontSize: 12, fontWeight: FontWeight.bold))),
+                      Expanded(child: Text("PREVIOUS", style: TextStyle(color: AppTheme.textTertiary, fontSize: 12, fontWeight: FontWeight.bold))),
+                      SizedBox(width: 70, child: Text("KG", textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textTertiary, fontSize: 12, fontWeight: FontWeight.bold))),
+                      SizedBox(width: 60, child: Text("REPS", textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textTertiary, fontSize: 12, fontWeight: FontWeight.bold))),
+                      SizedBox(width: 48, child: Icon(Icons.check, size: 16, color: AppTheme.textTertiary)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // Interactive Set Row
+                  BouncyButton(
+                    onTap: () => _openDataEntrySheet(InputFocus.weight),
+                    backgroundColor: set1Completed ? AppTheme.success.withValues(alpha: 0.1) : AppTheme.surfaceElevation1,
+                    border: Border.all(
+                      color: activeFocus != InputFocus.none ? AppTheme.secondaryAccent : (set1Completed ? AppTheme.success.withValues(alpha: 0.3) : Colors.transparent),
+                      width: activeFocus != InputFocus.none ? 2 : 1,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                    child: Row(
+                      children: [
+                        const SizedBox(
+                          width: 24, 
+                          child: Center(
+                            child: Text("1", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            "140 kg × 5", 
+                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 15),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        // Weight Field
+                        GestureDetector(
+                          onTap: () {
+                            if (activeFocus != InputFocus.none) setState(() => activeFocus = InputFocus.weight);
+                          },
+                          child: Container(
+                            width: 70,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: activeFocus == InputFocus.weight ? AppTheme.secondaryAccent.withValues(alpha: 0.2) : (set1Completed ? Colors.transparent : AppTheme.surfaceElevation2),
+                              border: Border.all(color: activeFocus == InputFocus.weight ? AppTheme.secondaryAccent : Colors.transparent),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              currentWeight, 
+                              textAlign: TextAlign.center, 
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold, 
+                                fontSize: 18, 
+                                color: activeFocus == InputFocus.weight ? AppTheme.secondaryAccent : (set1Completed ? AppTheme.success : Colors.white),
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Reps Field
+                        GestureDetector(
+                          onTap: () {
+                            if (activeFocus != InputFocus.none) setState(() => activeFocus = InputFocus.reps);
+                          },
+                          child: Container(
+                            width: 52,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: activeFocus == InputFocus.reps ? AppTheme.secondaryAccent.withValues(alpha: 0.2) : (set1Completed ? Colors.transparent : AppTheme.surfaceElevation2),
+                              border: Border.all(color: activeFocus == InputFocus.reps ? AppTheme.secondaryAccent : Colors.transparent),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              currentReps, 
+                              textAlign: TextAlign.center, 
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold, 
+                                fontSize: 18, 
+                                color: activeFocus == InputFocus.reps ? AppTheme.secondaryAccent : (set1Completed ? AppTheme.success : Colors.white),
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Check Button
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: set1Completed ? AppTheme.success : AppTheme.surfaceElevation2,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.check, 
+                            color: set1Completed ? Colors.black : AppTheme.textTertiary, 
+                            size: 20
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  // Weight Field
-                  Container(
-                    width: 70,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: set1Completed ? Colors.transparent : AppTheme.surfaceElevation2,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      "140", 
-                      textAlign: TextAlign.center, 
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold, 
-                        fontSize: 18, 
-                        color: set1Completed ? AppTheme.success : Colors.white,
-                        fontFeatures: const [FontFeature.tabularFigures()],
+                  
+                  // Rest Timer UI (Dynamic Feature)
+                  if (isResting)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 24),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppTheme.secondaryAccent.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppTheme.secondaryAccent.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.timer_outlined, color: AppTheme.secondaryAccent),
+                                const SizedBox(width: 12),
+                                Text(
+                                  "Rest Timer",
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              formattedTime,
+                              style: const TextStyle(
+                                color: AppTheme.secondaryAccent,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                                fontFeatures: [FontFeature.tabularFigures()],
+                              ),
+                            )
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Reps Field
-                  Container(
-                    width: 52,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: set1Completed ? Colors.transparent : AppTheme.surfaceElevation2,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      "5", 
-                      textAlign: TextAlign.center, 
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold, 
-                        fontSize: 18, 
-                        color: set1Completed ? AppTheme.success : Colors.white,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Check Button
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: set1Completed ? AppTheme.success : AppTheme.surfaceElevation2,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.check, 
-                      color: set1Completed ? Colors.black : AppTheme.textTertiary, 
-                      size: 20
-                    ),
-                  ),
                 ],
+              ),
+            ),
+            
+            // Finish Workout Bar
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: AppTheme.surfaceElevation1,
+                border: Border(top: BorderSide(color: AppTheme.borders)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: BouncyButton(
+                  onTap: () {
+                    HapticFeedback.heavyImpact();
+                    Navigator.pop(context); // Go back to Dashboard
+                  },
+                  backgroundColor: AppTheme.primaryAccent,
+                  borderRadius: BorderRadius.circular(16),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: const Center(
+                    child: Text(
+                      "FINISH WORKOUT",
+                      style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1.2),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -595,3 +754,4 @@ class _AmoledLoggingScreenState extends State<AmoledLoggingScreen> {
     );
   }
 }
+
