@@ -62,11 +62,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    final initStage = ref.watch(appInitializationProvider);
+    ref.listen<InitStage>(appInitializationProvider, (previous, next) {
+      if (next == InitStage.complete && !_isTransitioning) {
+        _triggerSuccessTransition();
+      }
+    });
 
-    if (initStage == InitStage.complete && !_isTransitioning) {
-      _triggerSuccessTransition();
-    }
+    final initStage = ref.watch(appInitializationProvider);
 
     return Scaffold(
       backgroundColor: Colors.black,
