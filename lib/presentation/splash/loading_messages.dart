@@ -40,7 +40,7 @@ class _LoadingMessagesState extends State<LoadingMessages> {
     "Touch grass... after the workout.",
   ];
 
-  late String _currentMessage;
+  String _currentMessage = "";
   Timer? _timer;
   final Random _random = Random();
 
