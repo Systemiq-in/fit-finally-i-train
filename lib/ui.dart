@@ -1,3 +1,4 @@
+import 'providers/workout_provider.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -209,87 +210,99 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
             ),
 
-            // Hero Card
+
+// Hero Card
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 32, 20, 0),
-                child: BouncyButton(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      PageRouteBuilder(
-                        transitionDuration: const Duration(milliseconds: 400),
-                        pageBuilder: (_, __, ___) => const AmoledLoggingScreen(),
-                        transitionsBuilder: (_, animation, __, child) {
-                          return SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0, 1),
-                              end: Offset.zero,
-                            ).animate(CurvedAnimation(
-                              parent: animation,
-                              curve: Curves.easeOutExpo,
-                            )),
-                            child: child,
-                          );
-                        },
-                      ),
-                    );
-                  },
-                  backgroundColor: AppTheme.surfaceElevation1,
-                  borderRadius: BorderRadius.circular(24),
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final todayWorkout = ref.watch(todayWorkoutProvider);
+                  
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 32, 20, 0),
+                    child: BouncyButton(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          PageRouteBuilder(
+                            transitionDuration: const Duration(milliseconds: 400),
+                            pageBuilder: (_, __, ___) => const AmoledLoggingScreen(),
+                            transitionsBuilder: (_, animation, __, child) {
+                              return SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(0, 1),
+                                  end: Offset.zero,
+                                ).animate(CurvedAnimation(
+                                  parent: animation,
+                                  curve: Curves.easeOutExpo,
+                                )),
+                                child: child,
+                              );
+                            },
+                          ),
+                        );
+                      },
+                      backgroundColor: AppTheme.surfaceElevation1,
+                      borderRadius: BorderRadius.circular(24),
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryAccent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              "PULL DAY",
-                              style: TextStyle(color: AppTheme.primaryAccent, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 1.0),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryAccent.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  todayWorkout.focus,
+                                  style: const TextStyle(color: AppTheme.primaryAccent, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 1.0),
+                                ),
+                              ),
+                              const Icon(Icons.arrow_forward_ios, color: AppTheme.textSecondary, size: 14),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            todayWorkout.title,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
                           ),
-                          const Icon(Icons.arrow_forward_ios, color: AppTheme.textSecondary, size: 14),
+                          const SizedBox(height: 4),
+                          Text(
+                            todayWorkout.subtitle,
+                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 14, fontStyle: FontStyle.italic),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            "\${todayWorkout.exerciseCount} exercises • \${todayWorkout.estimatedMins} mins",
+                            style: TextStyle(color: AppTheme.textTertiary, fontSize: 14),
+                          ),
+                          const SizedBox(height: 24),
+                          Container(
+                            width: double.infinity,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryAccent,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                "START WORKOUT",
+                                style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 14, letterSpacing: 1.0),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        "Heavy Back & Biceps",
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        "6 exercises • 45 mins",
-                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
-                      ),
-                      const SizedBox(height: 24),
-                      Container(
-                        width: double.infinity,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryAccent,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            "START WORKOUT",
-                            style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 14, letterSpacing: 1.0),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                }
               ),
             ),
           ],
