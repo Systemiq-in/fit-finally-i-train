@@ -193,7 +193,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            "\${index + 12}",
+                            "${index + 12}",
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w800,

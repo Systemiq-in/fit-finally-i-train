@@ -18,7 +18,7 @@ void main() async {
     await Firebase.initializeApp();
     await DatabaseService.initializeOfflinePersistence();
   } catch (e) {
-    print("Firebase initialization error (might need firebase_options.dart): \$e");
+    print("Firebase initialization error (might need firebase_options.dart): $e");
   }
 
   runApp(
